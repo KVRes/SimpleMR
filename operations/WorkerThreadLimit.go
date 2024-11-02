@@ -2,15 +2,45 @@ package operations
 
 import "sync"
 
+type SyncArr struct {
+	l   sync.Mutex
+	Raw []any
+}
+
+func (a *SyncArr) Push(data any) {
+	a.l.Lock()
+	defer a.l.Unlock()
+	a.Raw = append(a.Raw, data)
+}
+
+func (a *SyncArr) Get(idx int) any {
+	a.l.Lock()
+	defer a.l.Unlock()
+	return a.Raw[idx]
+}
+
 type WorkerPool struct {
 	WorkerThreads []*WorkerThread
 	MaxThreads    int
 	wg            sync.WaitGroup
+	rst           *SyncArr
 }
 
 type WorkerThread struct {
 	Idle bool
 	Lck  *sync.RWMutex
+}
+
+func (wp *WorkerPool) WaitAll() {
+	wp.wg.Wait()
+}
+
+func (wp *WorkerPool) Results() []any {
+	return wp.rst.Raw
+}
+
+func (wp *WorkerPool) ClearResults() {
+	wp.rst = &SyncArr{}
 }
 
 func (wp *WorkerPool) AddWorkerThread() {
@@ -24,6 +54,8 @@ func NewWorkerPool(maxThreads int) *WorkerPool {
 	pl := &WorkerPool{
 		MaxThreads: maxThreads,
 	}
+
+	pl.ClearResults()
 
 	for i := 0; i < maxThreads; i++ {
 		pl.AddWorkerThread()
@@ -64,20 +96,22 @@ func (wp *WorkerPool) AssignWork(fx WorkFx) {
 			if !w.setWorkState() {
 				continue
 			}
-			w.work(fx, wp.wg.Done)
+			w.work(fx, wp)
 			return
 		}
 	}
 }
 
-type WorkFx func()
+type WorkFx func() any
 
-func (w *WorkerThread) work(fx WorkFx, doneFx WorkFx) {
-	fx()
+func (w *WorkerThread) work(fx WorkFx, pool *WorkerPool) {
+	defer pool.wg.Done()
+
+	rst := fx()
+	pool.rst.Push(rst)
 	w.Lck.Lock()
 	defer w.Lck.Unlock()
 	w.Idle = true
-	doneFx()
 }
 
 func (wp *WorkerPool) AssignWorkQueue(fx []WorkFx) {

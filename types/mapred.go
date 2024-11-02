@@ -8,3 +8,7 @@ type Iterator[T any] interface {
 	HasNext() bool
 	Next() (string, T)
 }
+
+type Splitter interface {
+	SplitDataIntoMPieces(data any, m int) []any
+}
