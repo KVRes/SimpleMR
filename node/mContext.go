@@ -1,10 +1,10 @@
 package node
 
-type MapContext struct {
-	m MapResult
-}
+import "github.com/KVRes/SimpleMR/types"
 
-type MapResult map[string][]any
+type MapContext struct {
+	m types.Intermediate
+}
 
 func NewMapContext() *MapContext {
 	return &MapContext{

@@ -34,6 +34,10 @@ func (master *Master) initState() {
 	//for i := 0; i < len(master.state); i++ {
 	//	master.state[i] = make([]MasterCell, r)
 	//}
+	if master.partitioner == nil {
+		master.partitioner = HashPartitioner
+	}
+
 	if !master.validate() {
 		panic("Master not initialised")
 	}

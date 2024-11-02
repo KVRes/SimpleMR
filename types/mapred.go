@@ -11,4 +11,6 @@ package types
 
 type Splitter func(data any, m int) []any
 
-type ReduceTask map[string][]any
+type Partitioner func(key string) int
+
+type Intermediate map[string][]any
