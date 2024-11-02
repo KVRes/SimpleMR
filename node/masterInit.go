@@ -17,7 +17,11 @@ func (master *Master) WithMapWorker(m int) *Master {
 
 func (master *Master) WithReduceWorker(r int) *Master {
 	master.rWorker = worker.NewWorkerPool(r)
+	return master
+}
 
+func (master *Master) WithPartitioner(p types.Partitioner) *Master {
+	master.partitioner = p
 	return master
 }
 
