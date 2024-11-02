@@ -1,58 +1,62 @@
 package node
 
 import (
-	"github.com/KVRes/SimpleMR/operations"
 	"github.com/KVRes/SimpleMR/types"
+	"github.com/KVRes/SimpleMR/worker"
 )
 
-type MapResult map[string]any
-
 type Master struct {
-	state      [][]MasterCell // M * R
-	splitter   types.Splitter
-	mapTracker []int
-	mWorker    *operations.WorkerPool
-	rWorker    *operations.WorkerPool
+	splitter types.Splitter
+	mWorker  *worker.Pool
+	rWorker  *worker.Pool
 }
 
-func (master *Master) Start(data any, n int, m, r int, mapFx func(any) MapResult) {
-	master.state = make([][]MasterCell, m)
-	master.mWorker = operations.NewWorkerPool(m)
-	master.rWorker = operations.NewWorkerPool(r)
+func (master *Master) Start(
+	data any, nMap, nReduce int,
+	mapFx func(*MapContext, any),
+	reduceFx func(types.ReduceTask) any,
+) []any {
+	master.initState()
 
-	for i := 0; i < m; i++ {
-		master.state[i] = make([]MasterCell, r)
-	}
-	splitted := master.splitter.SplitDataIntoMPieces(data, n)
-	for _, s := range splitted {
+	// Map
+	mTasks := master.splitter.SplitDataIntoMPieces(data, nMap)
+	applyAll(mTasks, func(mTask any) {
 		master.mWorker.AssignWork(func() any {
-			return mapFx(s)
+			ctx := NewMapContext()
+			mapFx(ctx, mTask)
+			return ctx
 		})
-	}
+	})
 
 	master.mWorker.WaitAll()
+	rstUntyped := master.mWorker.Results()
+	rst := mapAll(rstUntyped, func(v any) MapResult {
+		return v.(*MapContext).m
+	})
 
-	rst := master.mWorker.Results()
+	// TODO: Combinator
 
-
-
-}
-
-func (master *Master) IsMapFinished(mapId int) bool {
-	if len(master.state) == 0 {
-		return true
+	// Shuffle
+	rTasks := make([]types.ReduceTask, nReduce)
+	for i := 0; i < nReduce; i++ {
+		rTasks[i] = make(map[string][]any)
 	}
-	col := len(master.state[mapId])
-
-	for i := 0; i < col; i++ {
-		if !master.state[mapId][i].MapOk {
-			return false
+	for _, r := range rst {
+		for k, v := range r {
+			bucketId := HashBucket(k, nReduce)
+			rTasks[bucketId][k] = v
 		}
 	}
-	return true
-}
 
-type MasterCell struct {
-	MapOk   bool
-	MapList []any
+	// Reduce
+	applyAll(rTasks, func(rTask types.ReduceTask) {
+		master.rWorker.AssignWork(func() any {
+			return reduceFx(rTask)
+		})
+	})
+
+	master.rWorker.WaitAll()
+
+	return master.rWorker.Results()
+
 }
