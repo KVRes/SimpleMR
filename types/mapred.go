@@ -9,8 +9,6 @@ package types
 //	Next() (string, T)
 //}
 
-type Splitter interface {
-	SplitDataIntoMPieces(data any, m int) []any
-}
+type Splitter func(data any, m int) []any
 
 type ReduceTask map[string][]any

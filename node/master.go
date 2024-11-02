@@ -19,7 +19,7 @@ func (master *Master) Start(
 	master.initState()
 
 	// Map
-	mTasks := master.splitter.SplitDataIntoMPieces(data, nMap)
+	mTasks := master.splitter(data, nMap)
 	applyAll(mTasks, func(mTask any) {
 		master.mWorker.AssignWork(func() any {
 			ctx := NewMapContext()
