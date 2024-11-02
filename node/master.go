@@ -49,8 +49,8 @@ func (master *Master) Start(
 	for _, r := range rst {
 		for k, v := range r {
 			bucketId := master.partitioner(k) % nReduce
-			src := rTasks[bucketId]
-			rTasks[bucketId][k] = append(src[k], v...)
+			bucket := rTasks[bucketId]
+			bucket[k] = append(bucket[k], v...)
 		}
 	}
 
